@@ -3,19 +3,22 @@
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
+  "engines": {
+    "node": "20.x"
+  },
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.11.2",
-    "@whiskeysockets/baileys": "^6.7.8",
-    "@ffmpeg-installer/ffmpeg": "^1.1.0",
-    "axios": "^1.6.0",
-    "dotenv": "^16.0.0",
-    "fluent-ffmpeg": "^2.1.2",
-    "pino": "^9.0.0",
-    "qrcode-terminal": "^0.12.0",
-    "sharp": "^0.33.0"
-    "yt-search": "^2.11.0"
+    "@google/generative-ai": "latest",
+    "@whiskeysockets/baileys": "latest",
+    "@ffmpeg-installer/ffmpeg": "latest",
+    "axios": "latest",
+    "dotenv": "latest",
+    "fluent-ffmpeg": "latest",
+    "pino": "latest",
+    "qrcode-terminal": "latest",
+    "sharp": "latest",
+    "yt-search": "latest"
   }
 }
