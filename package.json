@@ -12,13 +12,13 @@
   "dependencies": {
     "@google/generative-ai": "latest",
     "@whiskeysockets/baileys": "latest",
-    "@ffmpeg-installer/ffmpeg": "latest",
     "axios": "latest",
     "dotenv": "latest",
+    "ffmpeg-static": "latest",
     "fluent-ffmpeg": "latest",
     "pino": "latest",
     "qrcode-terminal": "latest",
     "sharp": "latest",
-    "yt-search": "latest"
+    "yt-search": "latest",
+    "ytdl-core": "latest"
   }
-}

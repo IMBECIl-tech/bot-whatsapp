@@ -56,11 +56,9 @@ async function iniciarBot() {
         }
 
        // 2. COMANDO: #PLAY (VERSIÓN ESTABLE)
-        else if (texto.startsWith('#play ')) {
+       else if (texto.startsWith('#play ')) {
             const busqueda = texto.replace('#play ', '').trim();
             if (!busqueda) return await sock.sendMessage(jid, { text: '⚠️ Escribe el nombre de la canción.' });
-
-            await sock.sendMessage(jid, { text: `🔍 Buscando y preparando: ${busqueda}...` });
 
             try {
                 const yts = (await import('yt-search')).default;
@@ -68,18 +66,22 @@ async function iniciarBot() {
                 const video = resultado.videos[0];
                 if (!video) return await sock.sendMessage(jid, { text: '❌ No encontrado.' });
 
-                // Usamos una API externa para descargar el MP3, así no dependemos de ffmpeg en la nube
-                const audioUrl = `https://api.vreden.my.id/api/ytmp3?url=${video.url}`;
-                
+                // 1. Enviamos el link primero, como querías
+                await sock.sendMessage(jid, { text: `🎵 *${video.title}*\n🔗 ${video.url}` });
+
+                // 2. Intentamos descargar con ytdl-core
+                const ytdl = (await import('ytdl-core')).default;
+                const stream = ytdl(video.url, { quality: 'highestaudio', filter: 'audioonly' });
+
                 await sock.sendMessage(jid, { 
-                    audio: { url: audioUrl }, 
+                    audio: { stream: stream }, 
                     mimetype: 'audio/mpeg',
-                    caption: `🎵 *${video.title}*`
+                    fileName: `${video.title}.mp3`
                 });
 
             } catch (error) {
                 console.error(error);
-                await sock.sendMessage(jid, { text: '⚠️ Error al procesar el audio. Intenta otro tema.' });
+                await sock.sendMessage(jid, { text: '⚠️ Error: No pude procesar este audio. Intenta con otro.' });
             }
         }
 
