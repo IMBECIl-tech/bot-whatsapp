@@ -1,0 +1,16 @@
+# Dependencias (Se instalan solas en Railway)
+node_modules/
+
+# Sesión de WhatsApp (No debes subirla, Railway la regenera)
+bit-nuevo/
+
+# Archivos de entorno (Tus llaves secretas NO deben ir a GitHub)
+.env
+
+# Archivos temporales generados por el bot
+music_*.mp3
+v_in_*.mp4
+v_out_*.webp
+sky_in_*.webp
+sky_out_*.mp4
+temp_pack_*.webp

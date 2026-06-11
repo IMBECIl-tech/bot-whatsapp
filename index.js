@@ -7,15 +7,14 @@ import fs from 'fs';
 import axios from 'axios'; 
 import sharp from 'sharp'; 
 import { GoogleGenAI } from '@google/genai';
-import { Readable } from 'stream';
-import { spawn } from 'child_process';
+import { ytDl } from 'yt-dlp-exec';
 import path from 'path';
+import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
 // Vinculamos el FFmpeg portátil de Node
-import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
-// CONFIGURACIÓN DE LAS LLAVES CONECTADAS AL ARCHIVO .ENV
+// CONFIGURACIÓN DE LAS LLAVES CONECTADAS AL ARCHIVO .ENV (O VARIABLES DE RAILWAY)
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); 
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 
@@ -39,7 +38,7 @@ async function iniciarBot() {
         if (connection === 'open') console.log('✅ ¡Bot Online! Súper Galería Multimedia V15.0 Activa.');
         if (connection === 'close') {
             console.log('🔄 Conexión perdida. Reconectando...');
-            iniciarBot();
+            setTimeout(iniciarBot, 5000);
         }
     });
 
@@ -53,7 +52,7 @@ async function iniciarBot() {
 
         // 1. MENU
         if (texto === '#menu') {
-            const menuText = `✨ *BOT MULTIVERSAL MULTIMEDIA V15.0* ✨\n\n*Comandos:*\n• #play [canción] - Descarga MP3 (Motor Local) 🎵\n• #images [personaje] - Ilustraciones Variadas (Umamusume, ZZZ, Invincible) 🦸‍♂️🔄\n• #memes [serie/juego] - Memes rápidos auto-descargables en MP4 🎭⚡\n• #packstickers [nombre] - Pack ULTRA EXPANDIDO (4 Galerías Globales) 📦🔥\n• #ia [pregunta] - Habla con Gemini 🤖\n• #s - Convierte Imagen, GIF o Video a Sticker 🎨🎬\n• #sky - Convierte Sticker a Imagen/Video (Anti-Crasheos EBUSY) 🔄\n• #ping - Verificar bot`;
+            const menuText = `✨ *BOT MULTIVERSAL MULTIMEDIA V15.0* ✨\n\n*Comandos:*\n• #play [canción] - Descarga MP3 🎵\n• #images [personaje] - Ilustraciones Variadas 🦸‍♂️🔄\n• #memes [tema] - Memes MP4 🎭⚡\n• #packstickers [nombre] - Pack Stickers 📦🔥\n• #ia [pregunta] - Habla con Gemini 🤖\n• #s - Convertir a Sticker 🎨🎬\n• #sky - Sticker a Imagen/Video 🔄\n• #ping - Verificar bot`;
             await sock.sendMessage(jid, { text: menuText });
         }
 
@@ -62,44 +61,30 @@ async function iniciarBot() {
             const busquedaMusica = texto.replace('#play ', '').trim();
             if (!busquedaMusica) return await sock.sendMessage(jid, { text: '⚠️ Escribe el nombre de la canción.' });
 
-            await sock.sendMessage(jid, { text: `🔍 Buscando canción en YouTube...` });
+            await sock.sendMessage(jid, { text: `🔍 Buscando: ${busquedaMusica}...` });
 
             try {
                 const yts = (await import('yt-search')).default;
                 const resultado = await yts(busquedaMusica);
                 const video = resultado.videos[0];
-
-                if (!video) return await sock.sendMessage(jid, { text: '❌ No encontré ninguna canción.' });
-
-                const titulo = video.title;
-                const urlVideo = video.url;
-                
-                await sock.sendMessage(jid, { text: `🎵 *Encontré:* ${titulo}\n🔗 *Enlace:* ${urlVideo}\n\n⏳ Extrayendo audio localmente...` });
+                if (!video) return await sock.sendMessage(jid, { text: '❌ No encontrado.' });
 
                 const pathAudioMp3 = path.join(process.cwd(), `music_${Date.now()}.mp3`);
-
-                const downloader = spawn('./yt-dlp.exe', [
-                    '-x', 
-                    '--audio-format', 'mp3',
-                    '--ffmpeg-location', ffmpegInstaller.path,
-                    '-o', pathAudioMp3,
-                    urlVideo
-                ]);
-
-                downloader.on('close', async (code) => {
-                    if (code === 0 && fs.existsSync(pathAudioMp3) && fs.statSync(pathAudioMp3).size > 0) {
-                        await sock.sendMessage(jid, { 
-                            audio: fs.readFileSync(pathAudioMp3), 
-                            mimetype: 'audio/mp4', 
-                            fileName: `${titulo}.mp3`
-                        });
-                    } else {
-                        await sock.sendMessage(jid, { text: '❌ Problema al procesar el audio con yt-dlp.' });
-                    }
-                    try { if (fs.existsSync(pathAudioMp3)) fs.unlinkSync(pathAudioMp3); } catch(e){}
+                
+                await ytDl(video.url, {
+                    extractAudio: true,
+                    audioFormat: 'mp3',
+                    output: pathAudioMp3,
+                    ffmpegLocation: ffmpegInstaller.path
                 });
+
+                if (fs.existsSync(pathAudioMp3)) {
+                    await sock.sendMessage(jid, { audio: fs.readFileSync(pathAudioMp3), mimetype: 'audio/mp4' });
+                    fs.unlinkSync(pathAudioMp3);
+                }
             } catch (error) {
-                await sock.sendMessage(jid, { text: '⚠️ Error en el comando #play.' });
+                console.error(error);
+                await sock.sendMessage(jid, { text: '⚠️ Error al procesar el audio en la nube.' });
             }
         }
 
@@ -108,7 +93,6 @@ async function iniciarBot() {
             let busquedaUser = texto.replace('#images ', '').trim().toLowerCase();
             if (!busquedaUser) return await sock.sendMessage(jid, { text: '⚠️ Escribe el personaje.' });
 
-            // Mapeos rápidos para la Wiki Fandom
             if (busquedaUser.includes('jane doe')) busquedaUser = 'jane';
             if (busquedaUser.includes('zhu yuan')) busquedaUser = 'zhu_yuan';
             if (busquedaUser.includes('burnice')) busquedaUser = 'burnice';
@@ -139,7 +123,6 @@ async function iniciarBot() {
                 if (!item) return await sock.sendMessage(jid, { text: `❌ No encontré registros para *${busquedaUser}*.` });
 
                 const pageTitle = item.title;
-
                 const urlImagenesPagina = `${urlWikiApi}?action=query&titles=${encodeURIComponent(pageTitle)}&prop=images&imlimit=120&format=json&origin=*`;
                 const resImgList = await axios.get(urlImagenesPagina);
                 const pagesImg = resImgList.data?.query?.pages;
@@ -197,7 +180,7 @@ async function iniciarBot() {
                         if (urlLink) urlsEncontradas.push(urlLink);
                     });
                 }
-            } catch(e){}
+            } catch (e) {}
 
             if (urlsEncontradas.length === 0) {
                 return await sock.sendMessage(jid, { text: `❌ No encontré memes para *${temaMeme}*.` });
@@ -216,7 +199,7 @@ async function iniciarBot() {
                     await sock.sendMessage(jid, { video: bufferMeme, gifPlayback: true, caption: `😂 Meme: *${temaMeme}*` });
                     enviado = true;
                     break;
-                } catch(err) {
+                } catch (err) {
                     continue;
                 }
             }
@@ -226,7 +209,7 @@ async function iniciarBot() {
             }
         }
 
-        // 5. COMANDO: #PACKSTICKERS (SISTEMA MULTI-GALERÍA AMPLIADO V15)
+        // 5. COMANDO: #PACKSTICKERS
         else if (texto.startsWith('#packstickers ')) {
             const personaje = texto.replace('#packstickers ', '').trim();
             if (!personaje) return await sock.sendMessage(jid, { text: '⚠️ ¿De qué personaje quieres el pack?' });
@@ -238,7 +221,6 @@ async function iniciarBot() {
             let busquedaGiphy = terminoLimpio;
             let tagsSecundarios = []; 
 
-            // --- TRADUCTOR AVANZADO DE TAGS EXACTOS (ZZZ) ---
             if (terminoLimpio.includes('burnice')) {
                 tagsSecundarios = ['burnice_white_(zenless_zone_zero)', 'burnice_white'];
                 busquedaGiphy = 'burnice white zenless zone zero';
@@ -268,7 +250,7 @@ async function iniciarBot() {
                 tagsSecundarios = [formatoGuion + '_(umamusume)', formatoGuion + '_(comic)', formatoGuion];
             }
 
-            // --- 1. FUENTE: DANBOORU ---
+            // --- FUENTES DE DATOS ---
             for (const tag of tagsSecundarios) {
                 try {
                     const res = await axios.get(`https://danbooru.donmai.us/posts.json?tags=${encodeURIComponent(tag)}+rating:general&limit=15`, { timeout: 4000 });
@@ -283,7 +265,6 @@ async function iniciarBot() {
                 } catch (e) {}
             }
 
-            // --- 2. FUENTE NUEVA: SAFEBOORU ---
             try {
                 let tagSafe = tagsSecundarios[0];
                 const resSafe = await axios.get(`https://safebooru.org/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(tagSafe)}&json=1&limit=15`, { timeout: 4000 });
@@ -297,24 +278,19 @@ async function iniciarBot() {
                 }
             } catch (e) {}
 
-            // --- 3. FUENTE NUEVA: GELBOORU ---
             try {
                 let tagGel = tagsSecundarios[0];
                 const resGel = await axios.get(`https://gelbooru.com/index.php?page=dapi&s=post&q=index&tags=${encodeURIComponent(tagGel)}+rating:general&json=1&limit=15`, { timeout: 4000 });
                 if (resGel.data && Array.isArray(resGel.data.post)) {
                     resGel.data.post.forEach(post => {
-                        if (post.file_url) {
-                            listaUrls.push({ url: post.file_url, animado: false });
-                        }
+                        if (post.file_url) listaUrls.push({ url: post.file_url, animado: false });
                     });
                 }
             } catch (e) {}
 
-            // --- 4. FUENTE: GIPHY ---
             try {
                 const offsetGiphy = Math.floor(Math.random() * 3);
-                const urlGiphy = `https://api.giphy.com/v1/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(busquedaGiphy)}&limit=12&offset=${offsetGiphy}&rating=g`;
-                const resGiphy = await axios.get(urlGiphy, { timeout: 4000 });
+                const resGiphy = await axios.get(`https://api.giphy.com/v1/stickers/search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(busquedaGiphy)}&limit=12&offset=${offsetGiphy}&rating=g`, { timeout: 4000 });
                 if (resGiphy.data?.data) {
                     resGiphy.data.data.forEach(item => {
                         const urlSticker = item.images.fixed_height?.url || item.images.original?.url;
@@ -323,23 +299,8 @@ async function iniciarBot() {
                 }
             } catch (e) {}
 
-            // --- FALLBACK EXTREMO ---
             if (listaUrls.length === 0) {
-                try {
-                    let palabraClave = terminoLimpio.split(' ')[0];
-                    const resFallback = await axios.get(`https://danbooru.donmai.us/posts.json?tags=${encodeURIComponent(palabraClave)}+rating:general&limit=10`);
-                    if (Array.isArray(resFallback.data)) {
-                        resFallback.data.forEach(post => {
-                            if (post.file_url && !post.file_url.endsWith('.mp4')) {
-                                listaUrls.push({ url: post.file_url, animado: false });
-                            }
-                        });
-                    }
-                } catch(e){}
-            }
-
-            if (listaUrls.length === 0) {
-                return await sock.sendMessage(jid, { text: `❌ La súper galería no encontró recursos válidos para *${personaje}*. Verifica la ortografía.` });
+                return await sock.sendMessage(jid, { text: `❌ Súper galería vacía para *${personaje}*. Revisa la ortografía.` });
             }
 
             listaUrls.sort(() => Math.random() - 0.5);
@@ -347,7 +308,7 @@ async function iniciarBot() {
             let totalEnviados = 0;
 
             for (const item of seleccionados) {
-                const outputPath = `./temp_pack_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.webp`;
+                const outputPath = path.join(process.cwd(), `temp_pack_${Date.now()}_${Math.random().toString(36).substr(2, 5)}.webp`);
                 try {
                     const resImage = await axios.get(item.url, { responseType: 'arraybuffer', timeout: 8000 });
                     const buffer = Buffer.from(resImage.data, 'binary');
@@ -366,11 +327,9 @@ async function iniciarBot() {
                             .toFile(outputPath);
                     }
 
-                    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0) {
-                        if (fs.statSync(outputPath).size < 1048576) { 
-                            await sock.sendMessage(jid, { sticker: fs.readFileSync(outputPath) });
-                            totalEnviados++;
-                        }
+                    if (fs.existsSync(outputPath) && fs.statSync(outputPath).size > 0 && fs.statSync(outputPath).size < 1048576) { 
+                        await sock.sendMessage(jid, { sticker: fs.readFileSync(outputPath) });
+                        totalEnviados++;
                     }
                 } catch (err) {}
                 
@@ -379,18 +338,18 @@ async function iniciarBot() {
             }
 
             if (totalEnviados === 0) {
-                await sock.sendMessage(jid, { text: '⚠️ Los recursos encontrados no pudieron procesarse. Intenta de nuevo.' });
+                await sock.sendMessage(jid, { text: '⚠️ No se pudieron procesar los stickers de esta tanda.' });
             }
         }
 
         // 6. COMANDO: #IA
         else if (texto.startsWith('#ia ')) {
             const pregunta = texto.replace('#ia ', '').trim();
-            if (!pregunta) return await sock.sendMessage(jid, { text: '⚠️ ¿Qué quieres preguntarme?' });
+            if (!pregunta) return await sock.sendMessage(jid, { text: '⚠️ ¿Qué deseas preguntar?' });
 
             try {
                 const respuestaIA = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
+                    model: 'gemini-1.5-flash',
                     contents: pregunta,
                     config: {
                         systemInstruction: "Eres un bot de WhatsApp experto en anime, cómics de Invincible y videojuegos. Usa emojis."
@@ -432,8 +391,8 @@ async function iniciarBot() {
                     let buffer = Buffer.from([]);
                     for await (const chunk of stream) buffer = Buffer.concat([buffer, chunk]);
                     
-                    const inputVideoTemp = `./v_in_${Date.now()}.mp4`;
-                    const outputWebpTemp = `./v_out_${Date.now()}.webp`;
+                    const inputVideoTemp = path.join(process.cwd(), `v_in_${Date.now()}.mp4`);
+                    const outputWebpTemp = path.join(process.cwd(), `v_out_${Date.now()}.webp`);
                     fs.writeFileSync(inputVideoTemp, buffer);
 
                     ffmpeg(inputVideoTemp)
@@ -497,8 +456,8 @@ async function iniciarBot() {
                 return await sock.sendMessage(jid, { text: '❌ WhatsApp no ha procesado el sticker. Intenta de nuevo.' });
             }
 
-            const pathWebpInput = `./sky_in_${Date.now()}.webp`;
-            const pathMp4Output = `./sky_out_${Date.now()}.mp4`;
+            const pathWebpInput = path.join(process.cwd(), `sky_in_${Date.now()}.webp`);
+            const pathMp4Output = path.join(process.cwd(), `sky_out_${Date.now()}.mp4`);
 
             try {
                 fs.writeFileSync(pathWebpInput, bufferSticker);
