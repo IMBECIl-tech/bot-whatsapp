@@ -6,7 +6,7 @@ import ffmpeg from 'fluent-ffmpeg';
 import fs from 'fs';
 import axios from 'axios'; 
 import sharp from 'sharp'; 
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { ytDl } from 'yt-dlp-exec';
 import path from 'path';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
@@ -15,7 +15,7 @@ import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 // CONFIGURACIÓN DE LAS LLAVES CONECTADAS AL ARCHIVO .ENV (O VARIABLES DE RAILWAY)
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }); 
+const ai = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 
 async function iniciarBot() {
