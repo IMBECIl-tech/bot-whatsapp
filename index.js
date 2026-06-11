@@ -55,40 +55,31 @@ async function iniciarBot() {
             await sock.sendMessage(jid, { text: menuText });
         }
 
-        // 2. COMANDO: #PLAY (CORREGIDO PARA USAR YTDL-CORE)
+       // 2. COMANDO: #PLAY (VERSIÓN ESTABLE)
         else if (texto.startsWith('#play ')) {
-            const busquedaMusica = texto.replace('#play ', '').trim();
-            if (!busquedaMusica) return await sock.sendMessage(jid, { text: '⚠️ Escribe el nombre de la canción.' });
+            const busqueda = texto.replace('#play ', '').trim();
+            if (!busqueda) return await sock.sendMessage(jid, { text: '⚠️ Escribe el nombre de la canción.' });
 
-            await sock.sendMessage(jid, { text: `🔍 Buscando: ${busquedaMusica}...` });
+            await sock.sendMessage(jid, { text: `🔍 Buscando y preparando: ${busqueda}...` });
 
             try {
                 const yts = (await import('yt-search')).default;
-                const ytdl = (await import('ytdl-core')).default;
-                const resultado = await yts(busquedaMusica);
+                const resultado = await yts(busqueda);
                 const video = resultado.videos[0];
                 if (!video) return await sock.sendMessage(jid, { text: '❌ No encontrado.' });
 
-                const pathAudioMp3 = path.join(process.cwd(), `music_${Date.now()}.mp3`);
+                // Usamos una API externa para descargar el MP3, así no dependemos de ffmpeg en la nube
+                const audioUrl = `https://api.vreden.my.id/api/ytmp3?url=${video.url}`;
                 
-                const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio' });
-                
-                ffmpeg(stream)
-                    .save(pathAudioMp3)
-                    .on('end', async () => {
-                        if (fs.existsSync(pathAudioMp3)) {
-                            await sock.sendMessage(jid, { audio: fs.readFileSync(pathAudioMp3), mimetype: 'audio/mpeg' });
-                            fs.unlinkSync(pathAudioMp3);
-                        }
-                    })
-                    .on('error', async (err) => {
-                        console.error(err);
-                        await sock.sendMessage(jid, { text: '⚠️ Error al procesar el audio.' });
-                    });
+                await sock.sendMessage(jid, { 
+                    audio: { url: audioUrl }, 
+                    mimetype: 'audio/mpeg',
+                    caption: `🎵 *${video.title}*`
+                });
 
             } catch (error) {
                 console.error(error);
-                await sock.sendMessage(jid, { text: '⚠️ Error al procesar el audio en la nube.' });
+                await sock.sendMessage(jid, { text: '⚠️ Error al procesar el audio. Intenta otro tema.' });
             }
         }
 
