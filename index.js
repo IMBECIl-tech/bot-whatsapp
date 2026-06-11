@@ -7,7 +7,6 @@ import fs from 'fs';
 import axios from 'axios'; 
 import sharp from 'sharp'; 
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { ytDl } from 'yt-dlp-exec';
 import path from 'path';
 import ffmpegInstaller from '@ffmpeg-installer/ffmpeg';
 
@@ -56,7 +55,7 @@ async function iniciarBot() {
             await sock.sendMessage(jid, { text: menuText });
         }
 
-        // 2. COMANDO: #PLAY
+        // 2. COMANDO: #PLAY (CORREGIDO PARA USAR YTDL-CORE)
         else if (texto.startsWith('#play ')) {
             const busquedaMusica = texto.replace('#play ', '').trim();
             if (!busquedaMusica) return await sock.sendMessage(jid, { text: '⚠️ Escribe el nombre de la canción.' });
@@ -65,23 +64,28 @@ async function iniciarBot() {
 
             try {
                 const yts = (await import('yt-search')).default;
+                const ytdl = (await import('ytdl-core')).default;
                 const resultado = await yts(busquedaMusica);
                 const video = resultado.videos[0];
                 if (!video) return await sock.sendMessage(jid, { text: '❌ No encontrado.' });
 
                 const pathAudioMp3 = path.join(process.cwd(), `music_${Date.now()}.mp3`);
                 
-                await ytDl(video.url, {
-                    extractAudio: true,
-                    audioFormat: 'mp3',
-                    output: pathAudioMp3,
-                    ffmpegLocation: ffmpegInstaller.path
-                });
+                const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio' });
+                
+                ffmpeg(stream)
+                    .save(pathAudioMp3)
+                    .on('end', async () => {
+                        if (fs.existsSync(pathAudioMp3)) {
+                            await sock.sendMessage(jid, { audio: fs.readFileSync(pathAudioMp3), mimetype: 'audio/mpeg' });
+                            fs.unlinkSync(pathAudioMp3);
+                        }
+                    })
+                    .on('error', async (err) => {
+                        console.error(err);
+                        await sock.sendMessage(jid, { text: '⚠️ Error al procesar el audio.' });
+                    });
 
-                if (fs.existsSync(pathAudioMp3)) {
-                    await sock.sendMessage(jid, { audio: fs.readFileSync(pathAudioMp3), mimetype: 'audio/mp4' });
-                    fs.unlinkSync(pathAudioMp3);
-                }
             } catch (error) {
                 console.error(error);
                 await sock.sendMessage(jid, { text: '⚠️ Error al procesar el audio en la nube.' });
@@ -342,21 +346,26 @@ async function iniciarBot() {
             }
         }
 
-        // 6. COMANDO: #IA
+        // 6. COMANDO: #IA (CORREGIDO LA SINTAXIS DE GOOGLE GEMINI)
         else if (texto.startsWith('#ia ')) {
             const pregunta = texto.replace('#ia ', '').trim();
             if (!pregunta) return await sock.sendMessage(jid, { text: '⚠️ ¿Qué deseas preguntar?' });
 
             try {
-                const respuestaIA = await ai.models.generateContent({
+                const model = ai.getGenerativeModel({ 
                     model: 'gemini-1.5-flash',
-                    contents: pregunta,
-                    config: {
-                        systemInstruction: "Eres un bot de WhatsApp experto en anime, cómics de Invincible y videojuegos. Usa emojis."
-                    }
+                    systemInstruction: "Eres un bot de WhatsApp experto en anime, cómics de Invincible y videojuegos. Usa emojis."
                 });
-                if (respuestaIA && respuestaIA.text) await sock.sendMessage(jid, { text: respuestaIA.text });
+                
+                const result = await model.generateContent(pregunta);
+                const response = await result.response;
+                const textoRespuesta = response.text();
+                
+                if (textoRespuesta) {
+                    await sock.sendMessage(jid, { text: textoRespuesta });
+                }
             } catch (error) {
+                console.error(error);
                 await sock.sendMessage(jid, { text: '❌ Error de conexión con la IA.' });
             }
         }
