@@ -62,26 +62,27 @@ async function iniciarBot() {
 
             try {
                 const yts = (await import('yt-search')).default;
+                const ytdl = (await import('ytdl-core')).default;
+                
                 const resultado = await yts(busqueda);
                 const video = resultado.videos[0];
                 if (!video) return await sock.sendMessage(jid, { text: '❌ No encontrado.' });
 
-                // 1. Enviamos el link primero, como querías
+                // 1. Enviamos el link primero
                 await sock.sendMessage(jid, { text: `🎵 *${video.title}*\n🔗 ${video.url}` });
 
-                // 2. Intentamos descargar con ytdl-core
-                const ytdl = (await import('ytdl-core')).default;
-                const stream = ytdl(video.url, { quality: 'highestaudio', filter: 'audioonly' });
-
+                // 2. Preparamos y enviamos el audio
+                const stream = ytdl(video.url, { filter: 'audioonly', quality: 'highestaudio' });
+                
                 await sock.sendMessage(jid, { 
                     audio: { stream: stream }, 
                     mimetype: 'audio/mpeg',
-                    fileName: `${video.title}.mp3`
+                    ptt: false // Cambia a true si quieres que se envíe como nota de voz
                 });
 
             } catch (error) {
-                console.error(error);
-                await sock.sendMessage(jid, { text: '⚠️ Error: No pude procesar este audio. Intenta con otro.' });
+                console.error("Error en #play:", error);
+                await sock.sendMessage(jid, { text: '⚠️ Error: No pude procesar el audio de este video.' });
             }
         }
 
