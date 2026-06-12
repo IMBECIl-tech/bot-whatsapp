@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "type": "module",
   "main": "index.js",
-  "engines": {
-    "node": "20.x"
-  },
   "scripts": {
     "start": "node index.js"
   },
@@ -18,7 +15,8 @@
     "fluent-ffmpeg": "latest",
     "pino": "latest",
     "qrcode-terminal": "latest",
-    "sharp": "latest",
+   "sharp": "latest",
     "yt-search": "latest",
     "ytdl-core": "latest"
   }
+}
